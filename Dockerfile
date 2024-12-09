@@ -1,21 +1,27 @@
-FROM golang:1.19.7-buster as build
+FROM golang:1.22-alpine AS build
 
 ENV GO111MODULE=on
 
+RUN apk add --no-cache git make bash curl vim
+RUN git config --global http.postBuffer 524288000
+
 WORKDIR /kubo
 
-COPY build/disable-blockstore-arc-cache.patch /patches/
+# COPY build/disable-blockstore-arc-cache.patch /patches/
 
-RUN git clone https://github.com/ipfs/kubo . && \
-    git checkout v0.19.2 && \
-    # Apply a patch for disabling the blockstore ARC cache
-    git apply /patches/disable-blockstore-arc-cache.patch
+RUN git clone https://github.com/ipfs/kubo . && git checkout v0.30.0
+# && git apply /patches/disable-blockstore-arc-cache.patch
 
 COPY . /kubo/ipfs-go-ds-storj
 
 # Build the kubo binary with the Storj datastore plugin from the current source code.
+RUN echo "Adding the storjds plugin.."
+RUN echo "" >> plugin/loader/preload_list
+RUN echo "storjds storj.io/ipfs-go-ds-storj/plugin 0" >> plugin/loader/preload_list
+RUN echo "Get plugin list to verify.."
+RUN cat plugin/loader/preload_list
+
 RUN go mod edit -replace storj.io/ipfs-go-ds-storj=./ipfs-go-ds-storj && \
-    echo "\nstorjds storj.io/ipfs-go-ds-storj/plugin 0" >> "plugin/loader/preload_list" && \
     go mod tidy && \
     # Next line is expected to fail
     make build || true && \
@@ -23,7 +29,8 @@ RUN go mod edit -replace storj.io/ipfs-go-ds-storj=./ipfs-go-ds-storj && \
     make build
 
 # Target image
-FROM ipfs/kubo:v0.19.2
+
+FROM ipfs/kubo:v0.30.0
 
 # Copy the ipfs from the build container.
 ENV SRC_DIR /kubo
