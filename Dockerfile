@@ -30,7 +30,7 @@ RUN go mod edit -replace storj.io/ipfs-go-ds-storj=./ipfs-go-ds-storj && \
 
 # Target image
 
-FROM ipfs/kubo:v0.36.0
+FROM ipfs/kubo:v0.37.0
 
 # Copy the ipfs from the build container.
 ENV SRC_DIR /kubo

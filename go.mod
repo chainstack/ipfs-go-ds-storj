@@ -9,7 +9,7 @@ require (
 	github.com/ipfs/go-ipfs-ds-help v1.1.0
 	github.com/ipfs/go-log v1.0.5
 	github.com/ipfs/go-log/v2 v2.5.1
-	github.com/ipfs/kubo v0.19.2
+	github.com/ipfs/kubo v0.37.0
 	github.com/jackc/pgx/v5 v5.4.1
 	github.com/multiformats/go-multihash v0.2.1
 	github.com/spacemonkeygo/monkit/v3 v3.0.20-0.20230419135619-fb89f20752cb

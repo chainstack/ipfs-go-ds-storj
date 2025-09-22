@@ -1,0 +1,34 @@
+---
+version: 2.1
+
+orbs:
+  cs: chainstack/platform@12.0.0
+
+filters: &filters-tag
+  tags:
+    only: /.*/
+  branches:
+    ignore: /.*/
+
+workflows:
+  storj-push:
+    unless: << pipeline.git.tag >>
+    jobs:
+    - cs/build-image:
+        context: "dev.chainstack | GCP"
+        tag: "'<< pipeline.number >>'"
+  storj-tag:
+    when: << pipeline.git.tag >>
+    jobs:
+    - cs/build-image:
+        name: build-dev-image
+        context: "dev.chainstack | GCP"
+        tag: << pipeline.git.tag >>
+        filters: *filters-tag
+        extra_build_args: "--build-arg ENV=production"
+    - cs/build-image:
+        name: build-prod-image
+        context: "prod.chainstack | GCP"
+        tag: << pipeline.git.tag >>
+        filters: *filters-tag
+        extra_build_args: "--build-arg ENV=production"
