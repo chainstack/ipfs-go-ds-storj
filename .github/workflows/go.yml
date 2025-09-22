@@ -28,8 +28,39 @@ jobs:
     steps:
     - uses: actions/checkout@v2
 
+    - name: Prepare CockroachDB certificates
+      run: |
+        mkdir -p cockroach-certs
+        docker run --rm -v "$PWD/cockroach-certs":/certs cockroachdb/cockroach:latest-v21.2 cert create-ca --certs-dir=/certs --ca-key=/certs/ca.key
+        docker run --rm -v "$PWD/cockroach-certs":/certs cockroachdb/cockroach:latest-v21.2 cert create-node localhost 127.0.0.1 --certs-dir=/certs --ca-key=/certs/ca.key
+        docker run --rm -v "$PWD/cockroach-certs":/certs cockroachdb/cockroach:latest-v21.2 cert create-client root --certs-dir=/certs --ca-key=/certs/ca.key
+        chmod 600 cockroach-certs/client.root.key
+
     - name: Start CockroachDB
-      run: docker run --rm -d -p 26257:26257 cockroachdb/cockroach:latest-v21.2 start-single-node --insecure
+      run: |
+        docker run --rm -d \
+          --name cockroach \
+          -e COCKROACH_SKIP_ENABLING_DIAGNOSTIC_REPORTING=1 \
+          -p 127.0.0.1:26257:26257 \
+          -p 127.0.0.1:8080:8080 \
+          -v "$PWD/cockroach-certs":/cockroach/certs \
+          cockroachdb/cockroach:latest-v21.2 start-single-node \
+            --certs-dir=/cockroach/certs \
+            --store=type=mem,size=512MiB \
+            --listen-addr=0.0.0.0:26257 \
+            --advertise-addr=localhost \
+            --http-addr=0.0.0.0:8080
+
+    - name: Wait for CockroachDB
+      run: |
+        for attempt in {1..30}; do
+          if docker exec cockroach cockroach sql --certs-dir=/cockroach/certs --execute='SELECT 1'; then
+            exit 0
+          fi
+          sleep 2
+        done
+        echo "CockroachDB did not become ready in time" >&2
+        exit 1
 
     - name: Set up Go
       uses: actions/setup-go@v2
@@ -43,5 +74,5 @@ jobs:
       run: go test -race -v ./...
       env:
         STORJ_TEST_POSTGRES: postgres://postgres:postgres@localhost/postgres?sslmode=disable
-        STORJ_TEST_COCKROACH: cockroach://root@localhost:26257/defaultdb?sslmode=disable
+        STORJ_TEST_COCKROACH: cockroach://root@localhost:26257/defaultdb?sslmode=verify-full&sslrootcert=${{ github.workspace }}/cockroach-certs/ca.crt&sslcert=${{ github.workspace }}/cockroach-certs/client.root.crt&sslkey=${{ github.workspace }}/cockroach-certs/client.root.key
         GOLOG_LOG_LEVEL: storjds=debug

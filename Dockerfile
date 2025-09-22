@@ -39,3 +39,18 @@ COPY --from=build $SRC_DIR/ipfs-go-ds-storj/docker/container_daemon /usr/local/b
 
 # Fix permissions on start_ipfs (ignore the build machine's permissions)
 RUN chmod 0755 /usr/local/bin/start_ipfs
+
+# Create dedicated runtime user to avoid running the daemon as root.
+RUN if command -v addgroup >/dev/null 2>&1; then \
+      addgroup --system storj 2>/dev/null || addgroup -S storj; \
+      adduser --system --ingroup storj --home /data/storj --disabled-password --gecos "" storj 2>/dev/null || \
+        adduser -S -G storj -h /data/storj storj; \
+    else \
+      groupadd --system storj && useradd --system --gid storj --home /data/storj storj; \
+    fi && \
+    mkdir -p /data/storj && \
+    chown -R storj:storj /data/storj
+
+ENV IPFS_PATH=/data/storj
+
+USER storj
